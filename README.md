@@ -67,19 +67,24 @@ huggingface-cli download Qwen/Qwen3-ForcedAligner-0.6B
 
 ### 4. 配置
 
+**复制配置模板并编辑**:
+
+```bash
+cd backend
+cp config.yaml.example config.yaml
+# 编辑 config.yaml，修改模型路径等配置
+```
+
 **设置环境变量** (敏感信息不要放在配置文件中):
 
 ```bash
-# 复制环境变量模板
-cp .env.example .env
-
-# 编辑 .env 文件，设置你的 API Key
+# 设置 API Key
 export LLM_API_KEY="your-api-key"
 # 可选：覆盖 API 端点
 export LLM_API_BASE="https://api.moonshot.cn/v1"
 ```
 
-**编辑 `backend/config.yaml`** (可选，调整模型配置):
+**配置文件说明** (`backend/config.yaml`):
 
 ```yaml
 asr:
@@ -229,7 +234,7 @@ export HF_ENDPOINT=https://hf-mirror.com
 video-learn/
 ├── backend/                 # Python 后端
 │   ├── config.py           # 配置管理
-│   ├── config.yaml         # 配置文件
+│   ├── config.yaml.example # 配置文件模板
 │   ├── main.py             # FastAPI 入口
 │   ├── models/             # 数据模型
 │   ├── routers/            # API 路由
