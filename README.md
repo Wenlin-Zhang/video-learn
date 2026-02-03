@@ -36,7 +36,7 @@
 ### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Wenlin-Zhang/video-learn.git
 cd video-learn
 ```
 
@@ -67,19 +67,32 @@ huggingface-cli download Qwen/Qwen3-ForcedAligner-0.6B
 
 ### 4. 配置
 
-编辑 `backend/config.yaml`:
+**设置环境变量** (敏感信息不要放在配置文件中):
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑 .env 文件，设置你的 API Key
+export LLM_API_KEY="your-api-key"
+# 可选：覆盖 API 端点
+export LLM_API_BASE="https://api.moonshot.cn/v1"
+```
+
+**编辑 `backend/config.yaml`** (可选，调整模型配置):
 
 ```yaml
 asr:
   # 使用 ModelScope 下载的模型路径
-  model: "/home/<user>/.cache/modelscope/hub/models/Qwen/Qwen3-ASR-0___6B"
-  aligner_model: "/home/<user>/.cache/modelscope/hub/models/Qwen/Qwen3-ForcedAligner-0___6B"
-  device: "cuda"  # 或 "cpu"
+  model: "/home/<user>/.cache/modelscope/hub/models/Qwen/Qwen3-ASR-0.6B"
+  aligner_model: "/home/<user>/.cache/modelscope/hub/models/Qwen/Qwen3-ForcedAligner-0.6B"
+  backend: "transformers"  # "vllm" 或 "transformers"
+  language: "Chinese"
 
 llm:
-  api_base: "https://api.openai.com/v1"  # 或其他兼容端点
-  api_key: "your-api-key"
-  model: "qwen3"  # 或 "kimi"
+  api_base: "https://api.moonshot.cn/v1"  # 或其他 OpenAI 兼容端点
+  # api_key 通过环境变量 LLM_API_KEY 设置
+  model: "kimi-k2.5"  # 或 "qwen3"
 
 storage:
   upload_dir: "./uploads"
@@ -172,8 +185,15 @@ npm run dev
 | 端点 | 方法 | 描述 |
 |------|------|------|
 | `/api/video/upload` | POST | 上传视频文件 |
+| `/api/video/start/{task_id}` | POST | 开始处理任务 |
 | `/api/video/status/{task_id}` | GET | 获取任务状态 |
 | `/api/video/result/{task_id}` | GET | 获取处理结果 |
+| `/api/video/subtitles/{task_id}` | GET | 获取字幕数据 |
+| `/api/video/lecture/{task_id}` | GET | 获取讲义数据 |
+| `/api/video/history` | GET | 获取历史记录 |
+| `/api/video/history/{task_id}` | GET | 获取历史详情 |
+| `/api/video/history/{task_id}` | DELETE | 删除历史记录 |
+| `/api/video/reprocess/{task_id}` | POST | 重新处理任务 |
 | `/api/export/markdown/{task_id}` | GET | 导出 Markdown |
 | `/api/export/word/{task_id}` | GET | 导出 Word |
 | `/ws/progress/{task_id}` | WebSocket | 实时进度推送 |
@@ -182,7 +202,7 @@ npm run dev
 
 ### Q: 显存不足 (CUDA out of memory)
 
-修改 `config.yaml` 将 `device` 改为 `cpu`，或设置环境变量:
+修改 `config.yaml` 将 `backend` 改为 `transformers` 并降低批处理大小，或设置环境变量:
 
 ```bash
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
