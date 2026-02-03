@@ -1,0 +1,28 @@
+asr:
+  # 模型路径：使用 ModelScope 下载后的本地路径
+  model: "/home/<username>/.cache/modelscope/hub/models/Qwen/Qwen3-ASR-0.6B"
+  aligner_model: "/home/<username>/.cache/modelscope/hub/models/Qwen/Qwen3-ForcedAligner-0.6B"
+  backend: "transformers"  # "vllm" 或 "transformers"，vllm需要额外安装
+  gpu_memory_utilization: 0.7  # vLLM GPU显存利用率
+  max_inference_batch_size: 8  # 推理批处理大小
+  max_new_tokens: 512  # 最大生成token数，长音频需要更大值
+  use_flash_attention: false  # 是否使用FlashAttention（需要额外安装flash-attn）
+  language: "Chinese"  # 默认语言
+  # 热词列表：用于上下文注入，提高专业术语的识别准确率
+  # 支持专业术语、人名、地名、产品名等
+  hotwords:
+    - "示例热词1"
+    - "示例热词2"
+  # 是否从文件名自动提取热词
+  extract_hotwords_from_filename: true
+
+llm:
+  api_base: "https://api.openai.com/v1"  # 或其他 OpenAI 兼容端点
+  # api_key 通过环境变量 LLM_API_KEY 设置，不要在此文件中存储敏感信息
+  # api_base 也可通过环境变量 LLM_API_BASE 覆盖
+  api_key: ""
+  model: "gpt-3.5-turbo"  # 或 "kimi-k2.5", "qwen3" 等
+
+storage:
+  upload_dir: "./uploads"
+  output_dir: "./outputs"

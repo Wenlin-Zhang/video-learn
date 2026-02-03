@@ -51,6 +51,7 @@ Thumbs.db
 # Project specific
 uploads/
 outputs/
+backend/config.yaml
 *.wav
 *.mp3
 *.mp4
