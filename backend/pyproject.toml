@@ -1,0 +1,54 @@
+[project]
+name = "video-learn-backend"
+version = "1.0.0"
+description = "课程教学视频处理系统后端"
+requires-python = ">=3.10"
+dependencies = [
+    # Web框架
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
+    "websockets>=12.0",
+    
+    # 配置管理
+    "pyyaml>=6.0.1",
+    "pydantic>=2.5.0",
+    
+    # 语音识别 (本地模型推理，包含vLLM支持)
+    "qwen-asr[vllm]>=0.0.6",
+    # 覆盖 qwen-asr 的旧依赖版本
+    "numba>=0.59.0",
+    "librosa>=0.10.2",
+    "soundfile>=0.12.1",
+    
+    # LLM调用
+    "openai>=1.12.0",
+    
+    # 音视频处理
+    "ffmpeg-python>=0.2.0",
+    
+    # Word文档导出
+    "python-docx>=1.1.0",
+    
+    # 工具
+    "aiofiles>=23.2.1",
+]
+
+[project.optional-dependencies]
+# FlashAttention需要单独安装（需要CUDA编译）
+# 安装命令: pip install flash-attn --no-build-isolation
+flash = ["flash-attn>=2.5.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.26.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
