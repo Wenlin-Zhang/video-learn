@@ -65,6 +65,49 @@ export const HistoryList: React.FC<HistoryListProps> = ({ onSelect, onReprocess,
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // 从文件名中去除 UUID 后缀，返回纯净的文件名
+  const stripTaskId = (filename: string): string => {
+    // 去掉扩展名
+    const dotIdx = filename.lastIndexOf('.');
+    const stem = dotIdx > 0 ? filename.substring(0, dotIdx) : filename;
+    const ext = dotIdx > 0 ? filename.substring(dotIdx) : '';
+    // 匹配末尾的 _UUID 模式
+    const uuidSuffix = /_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+    const cleaned = stem.replace(uuidSuffix, '');
+    return cleaned + ext;
+  };
+
+  // 构建显示名称映射：重名时追加日期区分
+  const getDisplayNames = (): Map<string, string> => {
+    const nameMap = new Map<string, string>();
+    // 按纯净名称分组
+    const groups = new Map<string, HistoryItem[]>();
+    for (const item of items) {
+      const clean = stripTaskId(item.video_name);
+      const group = groups.get(clean) || [];
+      group.push(item);
+      groups.set(clean, group);
+    }
+    for (const [clean, group] of groups) {
+      if (group.length === 1) {
+        nameMap.set(group[0].id, clean);
+      } else {
+        // 重名：追加日期区分
+        for (const item of group) {
+          const date = new Date(item.created_at);
+          const suffix = date.toLocaleString('zh-CN', {
+            month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit',
+          });
+          nameMap.set(item.id, `${clean} (${suffix})`);
+        }
+      }
+    }
+    return nameMap;
+  };
+
+  const displayNames = items.length > 0 ? getDisplayNames() : new Map<string, string>();
+
   return (
     <div className="history-overlay" onClick={onClose}>
       <div className="history-modal" onClick={e => e.stopPropagation()}>
@@ -92,10 +135,10 @@ export const HistoryList: React.FC<HistoryListProps> = ({ onSelect, onReprocess,
                 >
                   <div className="history-item-main">
                     <div className="history-item-title">
-                      {item.lecture_title || item.video_name}
+                      {item.lecture_title || displayNames.get(item.id) || item.video_name}
                     </div>
                     <div className="history-item-info">
-                      <span className="history-item-video">{item.video_name}</span>
+                      <span className="history-item-video">{displayNames.get(item.id) || item.video_name}</span>
                       <span className="history-item-duration">{formatDuration(item.duration)}</span>
                     </div>
                     <div className="history-item-date">{formatDate(item.created_at)}</div>

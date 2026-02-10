@@ -12,9 +12,29 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models.schemas import Lecture
 from services.lecture_generator import get_lecture_generator
+from services.history_service import get_history_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _get_lecture_path(task_id: str) -> str:
+    """从内存任务或历史记录中获取讲义文件路径"""
+    from routers.video import processing_tasks
+
+    if task_id in processing_tasks:
+        task = processing_tasks[task_id]
+        if task["status"] != "completed":
+            raise HTTPException(status_code=400, detail="任务尚未完成")
+        return task["result"]["lecture_path"]
+
+    history_service = get_history_service()
+    item = history_service.get(task_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not Path(item.lecture_path).exists():
+        raise HTTPException(status_code=404, detail="讲义文件已被删除")
+    return item.lecture_path
 
 
 def lecture_to_markdown(lecture: Lecture) -> str:
@@ -191,24 +211,17 @@ async def export_markdown(task_id: str):
     Returns:
         Markdown文件
     """
-    from routers.video import processing_tasks
-    
-    if task_id not in processing_tasks:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    
-    task = processing_tasks[task_id]
-    if task["status"] != "completed":
-        raise HTTPException(status_code=400, detail="任务尚未完成")
+    lecture_path = _get_lecture_path(task_id)
     
     # 加载讲义
     lecture_gen = get_lecture_generator()
-    lecture = lecture_gen.load_lecture(task["result"]["lecture_path"])
+    lecture = lecture_gen.load_lecture(lecture_path)
     
     # 转换为Markdown
     md_content = lecture_to_markdown(lecture)
     
     # 保存文件
-    output_path = Path(task["result"]["lecture_path"]).with_suffix(".md")
+    output_path = Path(lecture_path).with_suffix(".md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(md_content)
     
@@ -230,24 +243,17 @@ async def export_word(task_id: str):
     Returns:
         Word文档
     """
-    from routers.video import processing_tasks
-    
-    if task_id not in processing_tasks:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    
-    task = processing_tasks[task_id]
-    if task["status"] != "completed":
-        raise HTTPException(status_code=400, detail="任务尚未完成")
+    lecture_path = _get_lecture_path(task_id)
     
     # 加载讲义
     lecture_gen = get_lecture_generator()
-    lecture = lecture_gen.load_lecture(task["result"]["lecture_path"])
+    lecture = lecture_gen.load_lecture(lecture_path)
     
     # 转换为Word
     docx_content = lecture_to_docx(lecture)
     
     # 保存文件
-    output_path = Path(task["result"]["lecture_path"]).with_suffix(".docx")
+    output_path = Path(lecture_path).with_suffix(".docx")
     with open(output_path, "wb") as f:
         f.write(docx_content)
     

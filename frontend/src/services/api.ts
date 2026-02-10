@@ -2,10 +2,38 @@ import { ResultData, HistoryList, HistoryItem, PipelineState, ReprocessRequest }
 
 const API_BASE = '/api';
 
+// 检查是否有同名视频的处理记录
+export interface DuplicateInfo {
+  id: string;
+  video_name: string;
+  lecture_title: string | null;
+  created_at: string;
+  duration: number;
+}
+
+export interface DuplicateCheckResult {
+  has_duplicate: boolean;
+  duplicates: DuplicateInfo[];
+}
+
+export async function checkDuplicate(filename: string): Promise<DuplicateCheckResult> {
+  const response = await fetch(`${API_BASE}/video/check-duplicate?filename=${encodeURIComponent(filename)}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || '检查重复失败');
+  }
+
+  return response.json();
+}
+
 // 上传视频（不开始处理）
-export async function uploadVideo(file: File): Promise<{ task_id: string; status: string; message: string }> {
+export async function uploadVideo(file: File, overwriteTaskId?: string): Promise<{ task_id: string; status: string; message: string }> {
   const formData = new FormData();
   formData.append('file', file);
+  if (overwriteTaskId) {
+    formData.append('overwrite_task_id', overwriteTaskId);
+  }
 
   const response = await fetch(`${API_BASE}/video/upload`, {
     method: 'POST',
@@ -22,15 +50,15 @@ export async function uploadVideo(file: File): Promise<{ task_id: string; status
 
 // 开始处理视频
 export async function startProcessing(taskId: string, hotwords?: string): Promise<{ task_id: string; status: string; message: string }> {
-  const formData = new FormData();
+  const options: RequestInit = { method: 'POST' };
+
   if (hotwords) {
+    const formData = new FormData();
     formData.append('hotwords', hotwords);
+    options.body = formData;
   }
 
-  const response = await fetch(`${API_BASE}/video/start/${taskId}`, {
-    method: 'POST',
-    body: formData,
-  });
+  const response = await fetch(`${API_BASE}/video/start/${taskId}`, options);
 
   if (!response.ok) {
     const error = await response.json();

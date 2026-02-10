@@ -42,9 +42,13 @@ def extract_keywords_from_filename(filename: str) -> List[str]:
     # 移除扩展名
     name = Path(filename).stem
     
-    # 移除任务ID前缀（UUID格式: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx_）
-    uuid_pattern = r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}_'
+    # 移除任务ID后缀（UUID格式: _xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx）
+    uuid_pattern = r'_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
     name = re.sub(uuid_pattern, '', name, flags=re.IGNORECASE)
+    
+    # 兼容旧命名：移除任务ID前缀（UUID格式: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx_）
+    uuid_prefix_pattern = r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}_'
+    name = re.sub(uuid_prefix_pattern, '', name, flags=re.IGNORECASE)
     
     # 使用多种分隔符分割
     # 中文括号、英文括号、下划线、连字符、空格、点号

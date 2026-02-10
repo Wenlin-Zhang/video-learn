@@ -155,7 +155,12 @@ class LectureGenerator:
         logger.info(f"开始生成完整讲义，共{len(sections)}个小节")
         
         if title is None:
-            title = Path(video_file).stem
+            stem = Path(video_file).stem
+            # 去除文件名中的 UUID 后缀或前缀
+            import re
+            stem = re.sub(r'_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', '', stem, flags=re.IGNORECASE)
+            stem = re.sub(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}_', '', stem, flags=re.IGNORECASE)
+            title = stem
         
         # 为每个小节生成规范内容
         processed_sections = []

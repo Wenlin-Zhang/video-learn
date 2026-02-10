@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from config import load_config
 from routers import video, export, websocket
+from services.history_service import get_history_service
 
 # 创建日志目录
 log_dir = Path("logs")
@@ -74,6 +75,24 @@ outputs_dir.mkdir(parents=True, exist_ok=True)
 
 app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 app.mount("/outputs", StaticFiles(directory=str(outputs_dir)), name="outputs")
+
+# 启动时迁移旧数据 + 清理孤儿文件
+history_service = get_history_service()
+migrate_stats = history_service.migrate_legacy_data()
+if migrate_stats["migrated"] > 0:
+    logger.info(f"迁移旧数据: {migrate_stats['migrated']} 条记录")
+
+naming_stats = history_service.migrate_naming_convention()
+if naming_stats["renamed"] > 0:
+    logger.info(f"重命名文件: {naming_stats['renamed']} 条记录")
+
+cleanup_stats = history_service.cleanup_orphan_files()
+if cleanup_stats["cleaned_uploads"] > 0 or cleanup_stats["cleaned_outputs"] > 0:
+    logger.info(
+        f"清理孤儿文件: uploads={cleanup_stats['cleaned_uploads']}, "
+        f"outputs={cleanup_stats['cleaned_outputs']}, "
+        f"释放 {cleanup_stats['freed_bytes'] / 1024 / 1024:.1f} MB"
+    )
 
 
 @app.get("/")

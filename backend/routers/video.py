@@ -481,15 +481,45 @@ async def process_video_task(
         await send_progress(task_id, "error", 0, f"处理失败: {e}")
 
 
+@router.get("/check-duplicate")
+async def check_duplicate(filename: str):
+    """
+    检查是否已有同名视频的处理记录
+    
+    Args:
+        filename: 原始文件名
+        
+    Returns:
+        重复检测结果
+    """
+    history_service = get_history_service()
+    duplicates = history_service.find_by_original_name(filename)
+    return {
+        "has_duplicate": len(duplicates) > 0,
+        "duplicates": [
+            {
+                "id": item.id,
+                "video_name": item.video_name,
+                "lecture_title": item.lecture_title,
+                "created_at": item.created_at.isoformat(),
+                "duration": item.duration,
+            }
+            for item in duplicates
+        ]
+    }
+
+
 @router.post("/upload", response_model=VideoProcessResponse)
 async def upload_video(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    overwrite_task_id: Optional[str] = Form(None)
 ):
     """
     上传视频文件（不开始处理）
     
     Args:
         file: 视频文件
+        overwrite_task_id: 可选，覆盖已有任务的 ID（删除旧文件并复用 UUID）
         
     Returns:
         处理任务信息
@@ -506,14 +536,23 @@ async def upload_video(
     
     config = get_config()
     
-    # 生成任务ID
-    task_id = str(uuid.uuid4())
+    # 覆盖模式：删除旧文件，复用旧 task_id
+    if overwrite_task_id:
+        history_service = get_history_service()
+        old_item = history_service.get(overwrite_task_id)
+        if not old_item:
+            raise HTTPException(status_code=404, detail="要覆盖的任务不存在")
+        # 删除旧文件和历史记录
+        history_service.delete(overwrite_task_id, delete_files=True)
+        task_id = overwrite_task_id
+    else:
+        task_id = str(uuid.uuid4())
     
     # 保存上传的文件
     upload_dir = Path(config.storage.upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
     
-    video_path = upload_dir / f"{task_id}_{file.filename}"
+    video_path = upload_dir / f"{Path(file.filename).stem}_{task_id}{Path(file.filename).suffix}"
     
     with open(video_path, "wb") as f:
         content = await file.read()
@@ -521,8 +560,8 @@ async def upload_video(
     
     logger.info(f"视频文件已上传: {video_path}")
     
-    # 输出目录（与视频同名的文件夹）
-    output_dir = video_path.parent / video_path.stem
+    # 输出目录放到 outputs/ 中
+    output_dir = Path(config.storage.output_dir) / video_path.stem
     
     # 保存任务状态（待处理状态）
     processing_tasks[task_id] = {
@@ -620,8 +659,9 @@ async def process_local_video(
         user_hotwords = [word.strip() for word in hotwords.split('\n') if word.strip()]
         logger.info(f"用户自定义热词: {user_hotwords}")
     
-    # 输出目录（与视频同名的文件夹）
-    output_dir = video_path.parent / video_path.stem
+    # 输出目录放到 outputs/ 中
+    config = get_config()
+    output_dir = Path(config.storage.output_dir) / f"{video_path.stem}_{task_id}"
     
     # 启动后台处理任务
     processing_tasks[task_id] = {"status": "pending", "stage": "init"}

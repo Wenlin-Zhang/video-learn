@@ -11,8 +11,9 @@ import { HistoryList } from './components/HistoryList';
 import { StageSelector } from './components/StageSelector';
 import { useVideoSync } from './hooks/useVideoSync';
 import { useWebSocket } from './hooks/useWebSocket';
-import { uploadVideo, getTaskResult, loadHistoryResult, startProcessing } from './services/api';
+import { uploadVideo, getTaskResult, loadHistoryResult, startProcessing, checkDuplicate, DuplicateInfo } from './services/api';
 import { SubtitleEntry, Section, Lecture, ProcessingStage, HistoryItem } from './types';
+import { DuplicateDialog } from './components/DuplicateDialog';
 import './App.css';
 
 type AppState = 'idle' | 'uploaded' | 'uploading' | 'processing' | 'completed' | 'error';
@@ -31,6 +32,7 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [showStageSelector, setShowStageSelector] = useState(false);
   const [reprocessTaskId, setReprocessTaskId] = useState<string | null>(null);
+  const [duplicateInfo, setDuplicateInfo] = useState<{ filename: string; duplicates: DuplicateInfo[]; file: File; hotwordsInput: string } | null>(null);
 
   // 视频同步
   const {
@@ -77,21 +79,19 @@ function App() {
     },
   });
 
-  // 处理文件上传（只上传，不开始处理）
-  const handleFileSelect = useCallback(async (file: File, hotwordsInput: string) => {
+  // 执行实际上传
+  const doUpload = useCallback(async (file: File, hotwordsInput: string, overwriteTaskId?: string) => {
     setAppState('uploading');
     setErrorMessage('');
     
     try {
-      // 创建本地预览URL
       const localUrl = URL.createObjectURL(file);
       setVideoUrl(localUrl);
       setHotwords(hotwordsInput);
       
-      // 上传文件到服务器（不开始处理）
-      const response = await uploadVideo(file);
+      const response = await uploadVideo(file, overwriteTaskId);
       setTaskId(response.task_id);
-      setAppState('uploaded'); // 设置为已上传状态
+      setAppState('uploaded');
       
       setProgressMessage('视频已上传，请点击"开始处理"按钮开始处理');
     } catch (error) {
@@ -100,6 +100,58 @@ function App() {
       setErrorMessage(error instanceof Error ? error.message : '上传失败');
     }
   }, []);
+
+  // 处理文件上传（先检测重复）
+  const handleFileSelect = useCallback(async (file: File, hotwordsInput: string) => {
+    setErrorMessage('');
+    
+    try {
+      // 检查是否有同名视频
+      const result = await checkDuplicate(file.name);
+      if (result.has_duplicate) {
+        // 显示重复对话框，暂存文件信息
+        setDuplicateInfo({ filename: file.name, duplicates: result.duplicates, file, hotwordsInput });
+        return;
+      }
+    } catch {
+      // 检查失败不阻断上传
+    }
+    
+    await doUpload(file, hotwordsInput);
+  }, [doUpload]);
+
+  // 重复对话框回调
+  const handleDuplicateCancel = useCallback(async (openTaskId?: string) => {
+    setDuplicateInfo(null);
+    if (openTaskId) {
+      try {
+        const result = await loadHistoryResult(openTaskId);
+        setTaskId(openTaskId);
+        setSubtitles(result.subtitles);
+        setLecture(result.lecture);
+        const videoPath = result.video_path;
+        const filename = videoPath.split('/').pop();
+        setVideoUrl(`/uploads/${filename}`);
+        setAppState('completed');
+      } catch (error) {
+        console.error('加载历史记录失败:', error);
+        setAppState('error');
+        setErrorMessage(error instanceof Error ? error.message : '加载历史记录失败');
+      }
+    }
+  }, []);
+
+  const handleDuplicateOverwrite = useCallback(async (taskId: string) => {
+    if (!duplicateInfo) return;
+    setDuplicateInfo(null);
+    await doUpload(duplicateInfo.file, duplicateInfo.hotwordsInput, taskId);
+  }, [duplicateInfo, doUpload]);
+
+  const handleDuplicateNewUpload = useCallback(async () => {
+    if (!duplicateInfo) return;
+    setDuplicateInfo(null);
+    await doUpload(duplicateInfo.file, duplicateInfo.hotwordsInput);
+  }, [duplicateInfo, doUpload]);
 
   // 处理字幕点击
   const handleSubtitleClick = useCallback((subtitle: SubtitleEntry) => {
@@ -367,6 +419,17 @@ function App() {
             setShowStageSelector(false);
             setReprocessTaskId(null);
           }}
+        />
+      )}
+
+      {/* 同名视频检测对话框 */}
+      {duplicateInfo && (
+        <DuplicateDialog
+          filename={duplicateInfo.filename}
+          duplicates={duplicateInfo.duplicates}
+          onCancel={handleDuplicateCancel}
+          onOverwrite={handleDuplicateOverwrite}
+          onNewUpload={handleDuplicateNewUpload}
         />
       )}
     </div>
